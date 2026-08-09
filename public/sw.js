@@ -1,8 +1,12 @@
-const CACHE_NAME = 'recipe-pwa-v2';
+const CACHE_NAME = 'recipe-pwa-v3';
 const URLS_TO_CACHE = [
   '/recipe-pwa/',
   '/recipe-pwa/index.html',
-  '/recipe-pwa/manifest.json'
+  '/recipe-pwa/manifest.json',
+  '/recipe-pwa/icon-180.png',
+  '/recipe-pwa/icon-192.png',
+  '/recipe-pwa/icon-512.png',
+  '/recipe-pwa/icon-512-maskable.png'
 ];
 
 self.addEventListener('install', event => {
