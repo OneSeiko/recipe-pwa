@@ -2,6 +2,7 @@
   "name": "Книга рецептов",
   "short_name": "Рецепты",
   "description": "Персональная книга рецептов",
+  "id": "/recipe-pwa/",
   "start_url": "/recipe-pwa/",
   "scope": "/recipe-pwa/",
   "display": "standalone",
@@ -10,11 +11,22 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><text y='150' font-size='180'>📖</text></svg>",
+      "src": "/recipe-pwa/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/recipe-pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/recipe-pwa/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
-

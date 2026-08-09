@@ -107,8 +107,44 @@ function ensureUniqueCategories(baseCategories, recipes) {
   return Array.from(new Set([...baseCategories, ...used]));
 }
 
-function installPWA() {
-  alert('Чтобы установить как приложение: открой сайт в браузере Chrome или Safari и выбери «Добавить на главный экран».');
+const RUSSIAN_SEARCH_ENDINGS = [
+  'иями', 'ями', 'ами', 'его', 'ого', 'ему', 'ому', 'ее', 'ие', 'ые', 'ое',
+  'ей', 'ий', 'ый', 'ой', 'ем', 'им', 'ым', 'ом', 'их', 'ых', 'ую', 'юю',
+  'ая', 'яя', 'ою', 'ею', 'ах', 'ях', 'ам', 'ям', 'ов', 'ев', 'а', 'я',
+  'ы', 'и', 'у', 'ю', 'е', 'о',
+];
+
+function normalizeSearchToken(token) {
+  const normalized = token.toLowerCase().replaceAll('ё', 'е');
+  if (normalized.length <= 3) return normalized;
+
+  const ending = RUSSIAN_SEARCH_ENDINGS.find(
+    (candidate) => normalized.endsWith(candidate) && normalized.length - candidate.length >= 3,
+  );
+  return ending ? normalized.slice(0, -ending.length) : normalized;
+}
+
+function tokenizeForSearch(value) {
+  return String(value || '')
+    .match(/[a-zа-я0-9]+/giu)
+    ?.map(normalizeSearchToken)
+    .filter(Boolean) || [];
+}
+
+function matchesSmartSearch(query, values) {
+  const queryTokens = tokenizeForSearch(query);
+  if (queryTokens.length === 0) return true;
+
+  const valueTokens = tokenizeForSearch(values.join(' '));
+  return queryTokens.every((queryToken) => valueTokens.some((valueToken) => (
+    valueToken === queryToken
+    || (queryToken.length >= 3 && valueToken.startsWith(queryToken))
+    || (valueToken.length >= 3 && queryToken.startsWith(valueToken))
+  )));
+}
+
+function isStandaloneApp() {
+  return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
 function Ribbon({ label, active, onClick, colorClass = 'bg-rose-600' }) {
@@ -179,8 +215,9 @@ function RecipeCard({ recipe, onOpen, onToggleFavorite, onEdit, onDelete }) {
   );
 }
 
-function RecipeModal({ recipe, onClose, onToggleFavorite }) {
+function RecipeModal({ recipe, onClose, onToggleFavorite, onToggleIngredient, onResetIngredients }) {
   if (!recipe) return null;
+  const checkedIngredients = new Set(recipe.availableIngredients || []);
 
   return (
     <AnimatePresence>
@@ -228,12 +265,34 @@ function RecipeModal({ recipe, onClose, onToggleFavorite }) {
                     <Icon name="scroll" className="h-5 w-5" /> Ингредиенты
                   </h3>
                   <ul className="space-y-2 text-stone-700">
-                    {recipe.ingredients.map((item, idx) => (
-                      <li key={idx} className="rounded-2xl bg-white/80 px-4 py-3 shadow-sm">
-                        {item}
+                    {(recipe.ingredients || []).map((item, idx) => {
+                      const checked = checkedIngredients.has(idx);
+                      return (
+                      <li key={idx} className={cls('rounded-2xl px-4 py-3 shadow-sm transition', checked ? 'bg-emerald-50 text-emerald-900' : 'bg-white/80')}>
+                        <button
+                          type="button"
+                          aria-pressed={checked}
+                          aria-label={`${checked ? 'Убрать отметку' : 'Отметить наличие'}: ${item}`}
+                          onClick={() => onToggleIngredient(recipe.id, idx)}
+                          className="flex w-full items-center gap-3 text-left"
+                        >
+                          <span className={cls('flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition', checked ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-stone-300 bg-white text-transparent')}>
+                            ✓
+                          </span>
+                          <span className={checked ? 'line-through decoration-emerald-500/70' : ''}>{item}</span>
+                        </button>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
+                  <button
+                    type="button"
+                    onClick={() => onResetIngredients(recipe.id)}
+                    disabled={checkedIngredients.size === 0}
+                    className="mt-4 w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Сбросить все отметки
+                  </button>
                 </div>
 
                 <div>
@@ -349,6 +408,7 @@ function RecipeEditorModal({ open, onClose, onSave, categoryOptions, initialReci
 
   const submit = () => {
     if (!title.trim()) return;
+    const normalizedIngredients = normalizeLines(ingredients);
     onSave({
       id: initialRecipe?.id || crypto.randomUUID(),
       createdAt: initialRecipe?.createdAt || Date.now(),
@@ -356,13 +416,16 @@ function RecipeEditorModal({ open, onClose, onSave, categoryOptions, initialReci
       category: category || FALLBACK_CATEGORY,
       time,
       difficulty,
-      ingredients: normalizeLines(ingredients),
+      ingredients: normalizedIngredients,
       steps: normalizeLines(steps),
       note: note.trim(),
       author: author.trim() || 'Новый рецепт',
       tag: tag.trim() || 'Новинка',
       image: image || DEFAULT_RECIPE_IMAGE,
       favorite: initialRecipe?.favorite || false,
+      availableIngredients: (initialRecipe?.availableIngredients || []).filter(
+        (ingredientIndex) => ingredientIndex < normalizedIngredients.length,
+      ),
     });
     onClose();
   };
@@ -596,10 +659,50 @@ export default function RecipeBookPWA() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(isStandaloneApp);
 
   useEffect(() => {
     document.title = 'У меня вкуснее!😎';
+
+    const captureInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    const markInstalled = () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', captureInstallPrompt);
+    window.addEventListener('appinstalled', markInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', captureInstallPrompt);
+      window.removeEventListener('appinstalled', markInstalled);
+    };
   }, []);
+
+  const installPWA = async () => {
+    if (isInstalled) {
+      alert('Приложение уже установлено на этом устройстве.');
+      return;
+    }
+
+    if (installPrompt) {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      setInstallPrompt(null);
+      if (choice.outcome === 'accepted') setIsInstalled(true);
+      return;
+    }
+
+    const isAppleMobile = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    alert(
+      isAppleMobile
+        ? 'В Safari нажмите «Поделиться», затем «На экран Домой».'
+        : 'Откройте меню браузера и выберите «Установить приложение» или «Добавить на главный экран».',
+    );
+  };
 
   const categories = useMemo(() => {
     const merged = ensureUniqueCategories(customCategories, recipes);
@@ -610,8 +713,13 @@ export default function RecipeBookPWA() {
     return recipes.filter((recipe) => {
       const byCategory = category === 'Все' || recipe.category === category;
       const byFavorite = !showFavoritesOnly || recipe.favorite;
-      const haystack = [recipe.title, recipe.note, recipe.author, recipe.category, ...(recipe.ingredients || [])].join(' ').toLowerCase();
-      const byQuery = haystack.includes(query.trim().toLowerCase());
+      const byQuery = matchesSmartSearch(query, [
+        recipe.title,
+        recipe.note,
+        recipe.author,
+        recipe.category,
+        ...(recipe.ingredients || []),
+      ]);
       return byCategory && byFavorite && byQuery;
     });
   }, [recipes, category, query, showFavoritesOnly]);
@@ -622,6 +730,29 @@ export default function RecipeBookPWA() {
   const toggleFavorite = (id) => {
     setRecipes((prev) => prev.map((recipe) => (recipe.id === id ? { ...recipe, favorite: !recipe.favorite } : recipe)));
     setSelectedRecipe((prev) => (prev && prev.id === id ? { ...prev, favorite: !prev.favorite } : prev));
+  };
+
+  const updateIngredientChecks = (id, update) => {
+    const applyUpdate = (recipe) => (
+      recipe.id === id
+        ? { ...recipe, availableIngredients: update(recipe.availableIngredients || []) }
+        : recipe
+    );
+    setRecipes((prev) => prev.map(applyUpdate));
+    setSelectedRecipe((prev) => (prev ? applyUpdate(prev) : prev));
+  };
+
+  const toggleIngredient = (id, ingredientIndex) => {
+    updateIngredientChecks(id, (current) => {
+      const next = new Set(current);
+      if (next.has(ingredientIndex)) next.delete(ingredientIndex);
+      else next.add(ingredientIndex);
+      return [...next].sort((left, right) => left - right);
+    });
+  };
+
+  const resetIngredients = (id) => {
+    updateIngredientChecks(id, () => []);
   };
 
   const addRecipe = (recipe) => {
@@ -695,8 +826,8 @@ export default function RecipeBookPWA() {
                 <button onClick={() => setShowAddModal(true)} className="rounded-full bg-rose-600 px-5 py-3 text-sm font-medium text-white shadow-lg shadow-rose-200">
                   Новый шедевр
                 </button>
-                <button onClick={installPWA} className="rounded-full border border-amber-300 bg-white px-5 py-3 text-sm font-medium text-stone-700">
-                  Установить как PWA
+                <button onClick={installPWA} disabled={isInstalled} className="rounded-full border border-amber-300 bg-white px-5 py-3 text-sm font-medium text-stone-700 disabled:cursor-default disabled:opacity-60">
+                  {isInstalled ? 'Уже установлено' : installPrompt ? 'Установить приложение' : 'Установить как PWA'}
                 </button>
               </div>
             </div>
@@ -760,17 +891,6 @@ export default function RecipeBookPWA() {
                 </button>
               </div>
 
-              <div className="rounded-[28px] bg-stone-800 p-5 text-stone-100 shadow-lg">
-                <h2 className="flex items-center gap-2 text-lg font-semibold">
-                  <Icon name="camera" className="h-5 w-5" /> Фото и новые страницы
-                </h2>
-                <p className="mt-3 text-sm leading-6 text-stone-300">
-                  {cloud.user ? 'Рецепты и фотографии сохраняются в облаке и доступны на всех ваших устройствах.' : 'Войдите в облачную книгу, чтобы открыть рецепты на любом устройстве.'}
-                </p>
-                <button onClick={() => setShowAddModal(true)} className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-stone-800">
-                  <Icon name="plus" className="h-4 w-4" /> Добавить шедевр
-                </button>
-              </div>
             </aside>
 
             <section>
@@ -813,8 +933,8 @@ export default function RecipeBookPWA() {
                   <button onClick={() => setShowAddModal(true)} className="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2 text-sm text-white">
                     <Icon name="plus" className="h-4 w-4" /> Новый шедевр
                   </button>
-                  <button onClick={installPWA} className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-4 py-2 text-sm text-stone-700">
-                    <Icon name="folder" className="h-4 w-4" /> PWA
+                  <button onClick={installPWA} disabled={isInstalled} className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-4 py-2 text-sm text-stone-700 disabled:cursor-default disabled:opacity-60">
+                    <Icon name="folder" className="h-4 w-4" /> {isInstalled ? 'Установлено' : 'PWA'}
                   </button>
                 </div>
               </div>
@@ -838,7 +958,13 @@ export default function RecipeBookPWA() {
         </main>
       </div>
 
-      <RecipeModal recipe={selectedRecipe} onClose={() => setSelectedRecipe(null)} onToggleFavorite={toggleFavorite} />
+      <RecipeModal
+        recipe={selectedRecipe}
+        onClose={() => setSelectedRecipe(null)}
+        onToggleFavorite={toggleFavorite}
+        onToggleIngredient={toggleIngredient}
+        onResetIngredients={resetIngredients}
+      />
 
       <RecipeEditorModal open={showAddModal} onClose={() => setShowAddModal(false)} onSave={addRecipe} categoryOptions={categories.length ? categories : [FALLBACK_CATEGORY]} mode="add" />
 
