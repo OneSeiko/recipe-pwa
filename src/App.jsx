@@ -832,20 +832,22 @@ export default function RecipeBookPWA() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 self-end">
-              <div className="rounded-[28px] bg-white p-5 shadow-lg">
-                <div className="flex items-center gap-2 text-stone-500">
-                  <Icon name="book" className="h-4 w-4" /> Шедевров
+            <div className="grid min-w-0 grid-cols-1 gap-4 self-end min-[520px]:grid-cols-2">
+              <div className="min-w-0 rounded-[28px] bg-white p-4 shadow-lg sm:p-5">
+                <div className="flex min-w-0 items-start gap-2 text-xs leading-tight text-stone-500 sm:text-sm">
+                  <Icon name="book" className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 break-words">Шедевров</span>
                 </div>
-                <p className="mt-3 text-4xl font-bold">{recipes.length}</p>
+                <p className="mt-3 text-3xl font-bold sm:text-4xl">{recipes.length}</p>
               </div>
-              <div className="rounded-[28px] bg-white p-5 shadow-lg">
-                <div className="flex items-center gap-2 text-stone-500">
-                  <Icon name="heart" className="h-4 w-4" /> Шедевральных шедевров
+              <div className="min-w-0 rounded-[28px] bg-white p-4 shadow-lg sm:p-5">
+                <div className="flex min-w-0 items-start gap-2 text-xs leading-tight text-stone-500 sm:text-sm">
+                  <Icon name="heart" className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 break-words">Шедевральных шедевров</span>
                 </div>
-                <p className="mt-3 text-4xl font-bold">{favoritesCount}</p>
+                <p className="mt-3 text-3xl font-bold sm:text-4xl">{favoritesCount}</p>
               </div>
-              <div className="col-span-2 rounded-[28px] bg-stone-800 p-5 text-stone-100 shadow-lg">
+              <div className="rounded-[28px] bg-stone-800 p-5 text-stone-100 shadow-lg min-[520px]:col-span-2">
                 <div className="flex items-center gap-2 text-stone-300">
                   <Icon name="bookmark" className="h-4 w-4" /> Самому лучшему в мире Друзяшке-таракаше!🥳
                 </div>
@@ -858,7 +860,7 @@ export default function RecipeBookPWA() {
         </motion.header>
 
         <section className="relative mt-8">
-          <div className="flex flex-wrap gap-3 overflow-x-auto pb-4">
+          <div className="flex flex-wrap gap-3 pb-4">
             <Ribbon label="Главная" active={activeSection === 'home'} onClick={() => setActiveSection('home')} colorClass="bg-stone-700" />
             <Ribbon label="Каталог" active={activeSection === 'catalog'} onClick={() => setActiveSection('catalog')} colorClass="bg-rose-700" />
             <Ribbon label="Избранное" active={activeSection === 'favorites'} onClick={() => { setActiveSection('favorites'); setShowFavoritesOnly(true); }} colorClass="bg-amber-700" />
