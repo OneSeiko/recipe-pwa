@@ -57,6 +57,12 @@ function readCache(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return { value: fallback, exists: false };
+    // A short-lived deployment uploaded Cyrillic source text with the wrong
+    // encoding. Discard only caches that contain its unmistakable "????" runs.
+    if (/\?{4,}/.test(raw)) {
+      localStorage.removeItem(key);
+      return { value: fallback, exists: false };
+    }
     return { value: JSON.parse(raw), exists: true };
   } catch {
     return { value: fallback, exists: false };
