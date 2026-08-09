@@ -1,0 +1,20 @@
+{
+  "name": "????? ????????",
+  "short_name": "???????",
+  "description": "???????????? ????? ????????",
+  "start_url": "/recipe-pwa/",
+  "scope": "/recipe-pwa/",
+  "display": "standalone",
+  "background_color": "#fdf7ea",
+  "theme_color": "#fdf7ea",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><text y='150' font-size='180'>??</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
+
